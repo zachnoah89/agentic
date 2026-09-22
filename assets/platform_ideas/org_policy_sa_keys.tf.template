@@ -1,0 +1,15 @@
+# Phase 3 / Org-Level Mitigation: Disable Service Account Key Creation
+# Enforces an Organization Policy to block Service Account key creation at the project level,
+# preventing key generation even if a principal has Project Editor privileges.
+# Note: Requires Org Policy Admin permissions.
+
+resource "google_org_policy_policy" "disable_sa_key_creation" {
+  name   = "projects/$${var.gcp_project_id}/policies/iam.disableServiceAccountKeyCreation"
+  parent = "projects/$${var.gcp_project_id}"
+
+  spec {
+    rules {
+      enforce = "TRUE"
+    }
+  }
+}

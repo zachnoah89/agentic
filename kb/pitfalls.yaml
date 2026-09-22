@@ -1,0 +1,215 @@
+pitfalls:
+  - id: bigtable-ddl-requires-admin
+    applies_when:
+      cli_tool: cbt
+      operations: [createtable, createfamily, deletetable]
+    symptom: "cbt createtable fails with PermissionDenied"
+    cause: roles/bigtable.user permits only mutateRows/readRows data operations, not table DDL.
+    fix: Grant roles/bigtable.admin to user_0 in sandbox.yaml.
+    provenance: { lab: sandbox-demo, verified: true }
+
+  - id: reasoning-engine-location-global
+    applies_when:
+      service: aiplatform.reasoningEngine
+    symptom: "400 BadRequest: may not create storageClass STANDARD buckets with locationConstraint GLOBAL"
+    cause: location = 'global' is invalid for Reasoning Engine staging serialization buckets.
+    fix: Pin allowed_locations in sandbox.yaml to a supported regional location (e.g. us-central1).
+    provenance: { lab: sandbox-demo, verified: true }
+
+  - id: cloud-terminal-requires-editor
+    applies_when:
+      resource_type: cloud_terminal
+    symptom: "Resources failed to launch: shell"
+    cause: Cloud Sandbox Platform Schema v2 strictly requires roles/editor for cloud_terminal containers.
+    fix: "Migrate the lab environment to type: gcp_user and use native Cloud Shell."
+    severity: blocks-hardening
+
+  - id: sudo-requires-osadminlogin
+    applies_when:
+      vm_access: oslogin
+      commands: [sudo]
+    symptom: "user is not in the sudoers file. This incident will be reported."
+    cause: roles/compute.osLogin provides shell access without root/sudo escalation rights.
+    fix: Grant roles/compute.osAdminLogin instead of roles/compute.osLogin.
+    provenance: { lab: sandbox-demo, verified: true }
+
+  - id: project-level-sa-admin-escalation
+    applies_when:
+      role: roles/iam.serviceAccountAdmin
+      scope: project_level
+    symptom: "Security Gate Violation: Project-level SA admin allows privilege escalation."
+    cause: Student can bind roles/iam.serviceAccountTokenCreator on the default compute SA to gain full Editor rights.
+    fix: Scope roles/iam.serviceAccountAdmin strictly on the dedicated custom SA in Terraform via google_service_account_iam_member.
+
+  - id: ssh-assessment-silent-failure
+    applies_when:
+      assessment_type: user_0.SSH
+    symptom: "Ruby assessment reports generic 'Task not completed' with no error details."
+    cause: Missing one of the required SSH quartet roles (osLogin, serviceAccountUser, tunnelResourceAccessor, compute.viewer).
+    fix: Ensure user_0 has all four SSH quartet roles in sandbox.yaml.
+    provenance: { lab: sandbox-demo, verified: true }
+
+  - id: cli-tools-quota-failure
+    applies_when:
+      tools: [cbt, bq, gcloud]
+    symptom: "User not authorized to perform serviceusage.services.use on project"
+    cause: Modern CLI tools verify project quota consumption using Service Usage API.
+    fix: Always include roles/serviceusage.serviceUsageConsumer in sandbox.yaml.
+    provenance: { lab: sandbox-demo, lab2: sandbox-demo, verified: true }
+
+  - id: mustache-in-backticks-or-code
+    applies_when:
+      instructions_syntax: markdown_backticks_or_html_code
+    symptom: "Markdown renders unprocessed template tag or corrupted student instructions."
+    cause: Cloud Sandbox Platform parser does not expand mustache tags inside <code> tags or markdown backticks.
+    fix: Wrap the code block in <ql-code-block ... templated> instead.
+
+  - id: mustache-pipe-syntax
+    applies_when:
+      instructions_syntax: pipe_fallback
+    symptom: "SyntaxError or literal '{{{tag | fallback}}}' printed in student instructions."
+    cause: Pipe fallback syntax is unsupported in Cloud Sandbox Platform markdown parser.
+    fix: Use exact variable tag without pipe or fallback.
+
+  - id: project-number-tag-blank
+    applies_when:
+      mustache_tag: "{{{project_0.project_number}}}"
+    symptom: "Commands fail with blank project number argument."
+    cause: "{{{project_0.project_number}}} resolves to empty string in student environment."
+    fix: "Fetch project number dynamically: $(gcloud projects describe {{{project_0.project_id}}} --format='get(projectNumber)')."
+  - id: deceptive-project-iam-override
+    symptom: "Deceptive least privilege: sandbox.yaml displays roles/viewer but Terraform grants roles/owner at runtime"
+    cause: "google_project_iam_policy in terraform-files/main.tf overrides project policy and binds roles/owner to student"
+    fix: "Remove google_project_iam_policy and scope individual permissions via google_service_account_iam_member"
+    provenance: { lab: mini-lab-28, verified: true, author: znoah }
+  - id: managed_ide_proxy-ide_provisioner-sa-key-exfiltration
+    applies_when:
+      yaml_resource: [ide, cloud_terminal, looker_instance, jupyter_notebook]
+      policy_tier: genai_sandbox
+    symptom: "Attackers exfiltrate /home/user/keys.json from Managed Web IDE Proxy IDE/terminal and run external Gemini/Vertex AI inference despite genai_sandbox IAM Deny Policy."
+    cause: "Policy-Deny-SA-Keys (modules/deny_service_account_key_creation) exempts ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com. Managed Web IDE Proxy servicer.py uses ide-provisioner@ to mint a static JSON SA key with roles/editor or roles/aiplatform.user and mounts it at /home/user/keys.json inside the sandbox-platform-prod GKE cluster."
+    fix: "NEVER pair type: ide, cloud_terminal, looker_instance, or jupyter_notebook with policy_tier: genai_sandbox. Migrate the lab to native Cloud Shell / Vertex AI Workbench (type: gcp_user), or keep Managed Web IDE Proxy labs off genai_sandbox / public catalogs until Managed Web IDE Proxy supports keyless Workload Identity."
+    provenance: { bug: SEC-001, cl: SEC-001, verified: true, author: znoah }
+
+  - id: vpc-egress-firewall-control-plane-bypass
+    applies_when:
+      tf_resource: google_service_account_key
+    symptom: "Lab has tf/secure_network.tf deployed, yet attackers still burn Vertex AI / Gemini quota from external IPs."
+    cause: "tf/secure_network.tf is a Data-Plane VPC firewall that only governs packets originating from GCE VMs inside the student VPC (protecting attached Compute SAs via IMDSv2 169.254.169.254). Once a downloadable JSON key (google_service_account_key or /home/user/keys.json) is copied out of the browser, attackers invoke https://aiplatform.googleapis.com over the public internet (Control Plane), completely bypassing the student VPC."
+    fix: "Use VM-attached google_service_account with disable-legacy-endpoints=TRUE (so credentials never leave the VPC) instead of google_service_account_key. If a google_service_account_key is strictly required by pedagogy, NEVER grant it roles/aiplatform.user, roles/editor, or roles/owner; scope it strictly to a single non-LLM resource role + IAM time-expiry condition."
+    provenance: { bug: SEC-001, verified: true, author: znoah }
+
+  - id: authoritative-policy-omits-ide_provisioner
+    applies_when:
+      role: roles/owner
+      resource_type: google_project_iam_policy
+      service: iam
+    symptom: "Cloud Sandbox Platform assessment grading or project teardown fails silently, leaving orphaned resources in student projects."
+    cause: "Authoritative google_project_iam_policy in Terraform overwrites all project bindings and omits ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com, stripping roles/owner from the platform management service account."
+    fix: "Always include a binding block granting roles/owner to serviceAccount:ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com in data.google_iam_policy or switch to additive google_project_iam_member."
+    provenance: { lab: mini-lab-09, verified: true, author: znoah }
+
+  - id: managed-ide-novmcreate-mig-bypass
+    applies_when:
+      resource_type: google_project_iam_custom_role
+      service: compute.googleapis.com
+    symptom: "Student in Cloud Terminal (ManagedWebIDE) successfully provisions unauthorized GCE VMs despite custom role 'noVmCreate' omitting compute.instances.create."
+    cause: "The custom role grants compute.instanceGroupManagers.update for lab tasks. The student resizes the Managed Instance Group (gcloud compute instance-groups managed resize), and the internal Google APIs Service Agent (@cloudservices.gserviceaccount.com with roles/compute.admin) creates the VMs on their behalf."
+    fix: "Do not rely on custom IAM method exclusions (noVmCreate) to block resource creation. Enforce hard project vCPU/GPU quotas and migrate from ManagedWebIDE cloud_terminal to type: gcp_user with native Cloud Shell."
+    provenance: { lab: mini-lab-62, verified: true, author: znoah }
+
+  - id: managed-ide-default-compute-sa-editor-theft
+    applies_when:
+      role: roles/editor
+      resource_type: google_project_iam_policy
+      service: compute.googleapis.com
+    symptom: "Student restricted to noVmCreate or roles/viewer escalates to full project-wide roles/editor and enables billable GenAI/Vertex APIs."
+    cause: "The authoritative google_project_iam_policy in mini-lab Terraform explicitly binds roles/editor to the default Compute Engine service account (-compute@developer.gserviceaccount.com). Students SSH into backend VMs via OS Login/IAP (or modify instance metadata) and harvest the default SA's OAuth2 token from the metadata server."
+    fix: "Never bind roles/editor to -compute@developer.gserviceaccount.com in google_iam_policy. Bind minimal logging/monitoring roles to the VM service account, enforce disable-legacy-endpoints='TRUE', and deploy secure_network.tf."
+    provenance: { lab: mini-lab-06, lab2: mini-lab-62, verified: true, author: znoah }
+
+  - id: managed-ide-authoritative-iam-launch-deadlock
+    applies_when:
+      resource_type: cloud_terminal
+      service: iam.googleapis.com
+    symptom: "Intermittent lab launch failures with 'Resources failed to launch: shell' in Cloud Terminal mini-labs."
+    cause: "ManagedWebIDE (cloud_terminal) relies on broad project permissions on the project service account to initialize its container and IAP tunnels. When authoritative google_project_iam_policy runs during startup without strict dependency ordering, it strips permissions mid-initialization, deadlocking the container."
+    fix: "Transition mini-labs away from cloud_terminal + authoritative google_project_iam_policy to standard type: gcp_user with additive sandbox.yaml role bindings."
+    provenance: { lab: mini-lab-62, verified: true, author: znoah }
+
+  - id: cloud-terminal-backend-owner-override
+    applies_when:
+      resource_type: cloud_terminal
+    symptom: "Student inside Cloud Terminal has full roles/owner and storage/bigquery admin access despite custom YAML permissions."
+    cause: "The Cloud Lab Platform cloud_terminal provisioner ignores custom IAM roles declared in sandbox.yaml and hardcodes the student container credentials to receive roles/owner, roles/storage.admin, and roles/bigquery.admin."
+    fix: "If least-privilege IAM is required, migrate from type: cloud_terminal to type: gcp_user with native Cloud Shell. If cloud_terminal is mandated by mini-lab spec, ensure all VMs in terraform-files/ are protected by secure_network.tf and IMDSv2."
+    severity: blocks-hardening
+
+  - id: cloud-terminal-vpc-egress-bypass
+    applies_when:
+      resource_type: cloud_terminal
+      service: compute.googleapis.com
+    symptom: "Outbound network connections (e.g. curl to external C2 or mining ports) succeed from inside Cloud Terminal even when tf/secure_network.tf is deployed."
+    cause: "The cloud_terminal container runs in Google's managed tenant VPC outside the student's project_0 VPC. Therefore, secure_network.tf in project_0 only restricts GCE/GKE/Workbench VMs inside project_0, not commands executed directly inside the cloud_terminal container."
+    fix: "Understand the architectural boundary: deploy secure_network.tf to lock down all GCE/GKE VMs in project_0, and rely on Navy/platform-level tenant container egress rules for cloud_terminal."
+
+  - id: custom-ide-iap-firewall-requirement
+    applies_when:
+      resource_type: custom_ide
+      service: iap.googleapis.com
+    symptom: "Browser-based custom IDE (Code OSS, JupyterLab, Vertex Workbench, or custom_terminal VM) fails to load with '502 Bad Gateway' or connection timeout after applying secure_network.tf."
+    cause: "Unlike cloud_terminal, VM-backed custom IDEs run inside project_0 VPC. Strict firewall rules without Identity-Aware Proxy (IAP) TCP forwarding ranges block the browser proxy connection."
+    fix: "Include an ingress allow rule for source_ranges = ['35.235.240.0/20'] on TCP ports 22, 80, 443, 8080 in secure_network.tf when hardening VM-backed custom IDEs."
+
+  - id: unconstrained-curriculum-iam-admin
+    applies_when:
+      service: iam.googleapis.com
+    symptom: "IAM curriculum lab grants unconstrained roles/resourcemanager.projectIamAdmin or roles/iam.serviceAccountAdmin in sandbox.yaml, allowing students to self-grant roles/owner or roles/aiplatform.user or impersonate the Default Compute SA (roles/editor)."
+    cause: "sandbox.yaml does not support CEL IAM Conditions, and new GCP projects automatically grant roles/editor to the Default Compute Engine Service Account (-compute@developer.gserviceaccount.com)."
+    fix: "Remove roles/resourcemanager.projectIamAdmin from sandbox.yaml and provision it in Terraform (tf/iam_delegated.tf) with a Delegated Role Grant condition: api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(['<curriculum_roles>']) alongside google_project_default_service_accounts (action = 'DEPRIVILEGE')."
+    severity: blocks-hardening
+
+  - id: iam-role-admin-custom-role-escalation
+    applies_when:
+      service: iam.googleapis.com
+    symptom: "A student with roles/iam.roleAdmin + Delegated projectIamAdmin (allowing a custom role ID) escalates to full Vertex AI / Compute admin."
+    cause: "roles/iam.roleAdmin allows iam.roles.update on any custom role in the project. Even if modifiedGrantsByRole restricts role bindings to projects/{project}/roles/{custom_role}, the student can add aiplatform.* or compute.* permissions into that custom role and bind it."
+    fix: "Pre-create the custom role in Terraform, or do not combine roles/iam.roleAdmin with projectIamAdmin on user_0."
+    severity: blocks-hardening
+
+  - id: gcloud-conditional-iam-policy-interactive-prompt
+    applies_when:
+      tf_resource: google_project_iam_member
+      service: iam.googleapis.com
+    symptom: "Student or automated runner executing `gcloud projects add-iam-policy-binding` in an IAM curriculum lab hardened with `tf/iam_delegated.tf` encounters an unexpected interactive prompt (`Specify the condition you would like to add [1] None...`) or fails in non-interactive mode (`--quiet`) with `Adding a binding without specifying a condition to a policy containing conditions is prohibited`."
+    cause: "Once `tf/iam_delegated.tf` attaches a CEL condition (`modifiedGrantsByRole`) to the project IAM policy, the project IAM policy enters conditional mode. In conditional mode, `gcloud projects add-iam-policy-binding` refuses to add unconditional bindings unless `--condition=None` is explicitly passed on the CLI."
+    fix: "Append `--condition=None` to all `gcloud projects add-iam-policy-binding` commands in `instructions/en.md` (and any automated verification scripts) whenever a lab uses `tf/iam_delegated.tf` conditional IAM bindings."
+    provenance: { lab: sandbox-demo-service-accounts-and-roles-fundamentals, verified: true, author: znoah }
+  - id: missing-runtime-yaml-script-runner-failure
+    applies_when:
+      script_type: sandbox-platform
+      runtime: terraform
+    symptom: "Resources failed to launch: project 0 (error uploading script to script runner: bad request, invalid script: missing runtime.yaml file.)"
+    cause: "The Cloud Sandbox Platform script runner requires a valid runtime.yaml file declaring runtime and version in the startup_script path. When security hardening adds tf/ for secure_network.tf or IAM scoping, omitting runtime.yaml causes the lab launch to fail completely."
+    fix: "Ensure runtime.yaml (runtime: terraform, version: 1.12.1) exists in the startup script directory (e.g. tf/runtime.yaml)."
+    severity: blocks-hardening
+    provenance:
+      lab: sandbox-demo
+      bug: SEC-004
+      verified: true
+  - id: startup-vm-missing-compute-viewer-bq-region-fallback
+    applies_when:
+      role: roles/compute.viewer
+      service: bigquery.googleapis.com,dataplex.googleapis.com
+    symptom: "Regional Dataplex Aspect Type ('Critical Data Aspect') does not appear in Knowledge Catalog Optional Aspects dropdown for BigQuery tables provisioned by startup.sh; breadcrumb shows dataset in 'us' multi-region instead of default_region."
+    cause: "Stripping roles/editor from the startup VM's custom service account removes compute.instances.list (roles/compute.viewer). When startup.sh runs 'gcloud compute instances list' to derive ZONE and REGION, both evaluate to empty string (''), causing 'bq --location=$REGION mk --dataset' to default to the US multi-region ('us') instead of project_0.default_region. Dataplex Knowledge Catalog then hides regional Aspect Types when inspecting multi-region 'us' BigQuery tables."
+    fix: "Grant roles/compute.viewer to the startup VM's service account in tf/main.tf (with depends_on on the GCE instance) and add a GCE Metadata Server fallback (http://metadata.google.internal/computeMetadata/v1/instance/zone) in startup.sh."
+    provenance: { lab: sandbox-demo-data-lineage-with-dataplex, verified: true, author: znoah }
+  - id: ssh-assessment-vm-sa-requires-dataplex-catalog-admin
+    applies_when:
+      role: roles/dataplex.catalogAdmin
+      service: dataplex.googleapis.com
+    symptom: "Activity tracking checks step_two_check.rb / step_three_check.rb fail via user_0.SSH on startup-vm with 'PERMISSION_DENIED: Permission dataplex.aspectTypes.get / dataplex.entries.get denied on projects/.../entryGroups/@bigquery/entries/...'."
+    cause: "Ruby assessment checks using user_0.SSH execute gcloud commands inside the target VM as the VM's attached service account (e.g. custom-compute@). Furthermore, roles/dataplex.viewer only covers Dataplex Lakes/Zones and does not include dataplex.aspectTypes.get or dataplex.entries.get for @bigquery Universal Catalog entries."
+    fix: "Grant roles/dataplex.admin and roles/dataplex.catalogAdmin at the project level to the target VM's attached service account in tf/main.tf whenever Ruby SSH assessment checks run gcloud dataplex aspect-types or entries describe on the VM."
+    provenance: { lab: sandbox-demo-data-lineage-with-dataplex, verified: true, author: znoah }

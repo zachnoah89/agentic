@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cloud_sandbox_security": {
+      "command": "python3",
+      "args": ["mcp/server.py"],
+      "env": {
+        "SANDBOX_REPO_ROOT": "./examples"
+      }
+    }
+  }
+}

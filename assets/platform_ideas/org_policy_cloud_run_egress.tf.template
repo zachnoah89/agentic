@@ -1,0 +1,17 @@
+# Phase 3 / Org-Level Mitigation: Force Cloud Run VPC Egress
+# Enforces that all Cloud Run egress traffic is routed through a VPC network
+# (via Serverless VPC Access connector or Direct VPC Egress) so that VPC egress firewalls apply.
+# Note: Requires Org Policy Admin permissions.
+
+resource "google_org_policy_policy" "cloud_run_allowed_vpc_egress" {
+  name   = "projects/$${var.gcp_project_id}/policies/run.allowedVPCEgress"
+  parent = "projects/$${var.gcp_project_id}"
+
+  spec {
+    rules {
+      values {
+        allowed_values = ["all-traffic"]
+      }
+    }
+  }
+}

@@ -1,0 +1,103 @@
+roles:
+  - id: roles/viewer
+    grants: Read-only access to most Google Cloud console pages and resources
+    risk: low
+    why_safe: Enables student to navigate console and verify resources without permission to mutate or delete infrastructure.
+    recommend_always_baseline: true
+
+  - id: roles/serviceusage.serviceUsageConsumer
+    grants: Inspect service status, quotas, and consume project billing
+    risk: low
+    why_safe: Read/use only. Cannot enable new APIs or increase quotas. Essential for CLI tools (gcloud, cbt, bq).
+    recommend_always_baseline: true
+
+  - id: roles/browser
+    grants: Read project metadata and hierarchy
+    risk: low
+    why_safe: Needed to query project number dynamically via gcloud projects describe.
+
+  - id: roles/storage.admin
+    grants: Full control over Cloud Storage buckets and objects
+    risk: low
+    why_safe: Ephemeral storage capped to lab runtime. Necessary for code deployment buckets (Cloud Functions, Vertex AI staging).
+
+  - id: roles/aiplatform.user
+    grants: Query Vertex AI models, chat prompts, evaluate results
+    risk: low
+    why_safe: Interacts with GenAI models without ability to alter fine-tuned endpoints or model infrastructure.
+
+  - id: roles/notebooks.admin
+    grants: Manage Vertex AI Workbench User-Managed Notebooks
+    risk: medium
+    why_safe: Enables JupyterLab proxy UI access. Network isolation prevents external abuse. Must be paired with roles/iam.serviceAccountUser.
+
+  - id: roles/run.admin
+    grants: Full control over Cloud Run services and revisions
+    risk: medium
+    why_safe: Needed to deploy containerized apps. Public ingress mitigated by ephemeral lab timer and network egress restrictions.
+
+  - id: roles/cloudbuild.builds.editor
+    grants: Submit and cancel Cloud Build jobs
+    risk: medium
+    why_safe: Needed to build container images during Cloud Run deployments.
+
+  - id: roles/compute.osAdminLogin
+    grants: SSH shell access with sudo privileges on OS Login enabled VMs
+    risk: medium
+    prefer_over:
+      - role: roles/compute.osLogin
+        when: student must run sudo commands
+        because: roles/compute.osLogin blocks sudo execution with authorization failures
+
+  - id: roles/compute.osLogin
+    grants: Standard non-root SSH shell access on OS Login enabled VMs
+    risk: low
+    why_safe: Standard shell access without sudo rights.
+
+  - id: roles/iap.tunnelResourceAccessor
+    grants: Establish TCP/SSH tunnel through Identity-Aware Proxy
+    risk: low
+    why_safe: Allows connecting to VMs without public external IPs via Cloud Console SSH button or --tunnel-through-iap.
+
+  - id: roles/bigtable.admin
+    grants: Manage Bigtable instances, clusters, and table DDL schemas
+    risk: medium
+    prefer_over:
+      - role: roles/bigtable.user
+        when: student runs cbt table lifecycle commands (createtable, createfamily, deletetable)
+        because: roles/bigtable.user only permits row-level mutate/read and fails on DDL
+
+  - id: roles/bigtable.user
+    grants: Read and write data within Bigtable tables
+    risk: low
+    why_safe: Data manipulation only.
+
+  - id: roles/datamigration.admin
+    grants: Configure and run Database Migration Service jobs
+    risk: medium
+    why_safe: Necessary for database migration pipelines.
+
+  - id: roles/alloydb.admin
+    grants: Manage AlloyDB clusters and instances
+    risk: medium
+    why_safe: Necessary for AlloyDB database labs.
+
+  - id: roles/datastore.user
+    grants: Read/write Datastore / Firestore data
+    risk: low
+    why_safe: Required for saving/loading prompt history in Vertex AI Agent Studio UI.
+
+  - id: roles/iam.serviceAccountAdmin
+    risk: critical
+    never_at_project_level: true
+    escalation_notes: >
+      Project-level grant allows binding roles/iam.serviceAccountTokenCreator to the default Compute SA
+      (which inherits roles/editor), escalating to full project Editor.
+    remediation: Scope strictly on specific google_service_account in Terraform via google_service_account_iam_member.
+
+  - id: roles/iam.serviceAccountUser
+    risk: high
+    never_at_project_level: true
+    escalation_notes: >
+      Allows student to run workloads as any project service account.
+    remediation: Scope in Terraform on specific service account resource.

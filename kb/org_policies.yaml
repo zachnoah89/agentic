@@ -1,0 +1,108 @@
+# Cloud Sandbox Platform Organization-Level Security Knowledge Base
+# Mapping of organization-level controls, policy tier baselines, and architecture patterns.
+
+version: 1.0.0
+last_updated: "2026-09-15"
+author: "Cloud Sandbox Security Architecture"
+
+# -----------------------------------------------------------------------------
+# 1. CONTROLS ENFORCED AT ORGANIZATION / PLATFORM LAYER
+# -----------------------------------------------------------------------------
+enforced_in_platform:
+  - id: sa-key-creation-deny-policy
+    name: "Service Account Key Creation IAM Deny Policy"
+    mechanism: "google_iam_deny_policy"
+    implementation_ref: "infra/org_policies/modules/deny_service_account_key_creation"
+    advisory: "SEC-001"
+    active_folders:
+      - name: "genai_sandbox"
+        prod_folder_id: "folders/100000000101"
+        staging_folder_id: "folders/100000000102"
+    denied_permissions:
+      - "iam.googleapis.com/serviceAccountKeys.create"
+    denied_principals:
+      - "principalSet://goog/public:all"
+    exempt_principals:
+      - "principal://iam.googleapis.com/projects/-/serviceAccounts/ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com"
+      - "principal://iam.googleapis.com/projects/-/serviceAccounts/cluster-orchestrator@sandbox-platform-prod.iam.gserviceaccount.com"
+    notes: >
+      Replaced the legacy boolean Org Policy (constraints/iam.disableServiceAccountKeyCreation)
+      which lacked principal exemption support for control-plane Terraform provisioners.
+      WARNING (SEC-002): Because ide-provisioner@ is exempted to spin up Managed Web IDE containers,
+      never pair a managed Web IDE container that mounts static `/home/user/keys.json` credentials
+      with the `genai_sandbox` policy tier.
+
+  - id: restricted-compute-machine-types
+    name: "Compute Engine Machine Type Restrictions"
+    mechanism: "Sandbox Quota & Machine Type Policy Tier"
+    applicable_tiers:
+      - "standard_sandbox"
+      - "ephemeral_workshop"
+      - "genai_sandbox"
+    enforcement:
+      machine_type_set: "Standard E2/N2 Series"
+      max_vms_per_project: 6
+      max_cores_per_region: 24
+      global_core_cap: 32
+      gpus_allowed: 0
+    notes: >
+      Platform automatically prevents high-cost GPU/TPU machine types on untrusted sandbox tiers.
+      Environment authors do not need to declare compute.restrictMachineTypes Org Policies in per-sandbox Terraform.
+
+  - id: custom-producer-quotas
+    name: "Denial-of-Wallet Mitigation Producer Quotas"
+    mechanism: "Consumer Quota Override Controller"
+    enforced_limits:
+      aiplatform:
+        global_generate_content_tpm: 60000
+        global_prediction_rpm: 100
+        custom_model_training_gpus: 0
+        custom_model_serving_gpus: 0
+      run:
+        instance_limit_regional: 10
+        max_instances_per_project: 32
+      cloudbuild:
+        ongoing_builds: 2
+        concurrent_cpus: 4
+
+  - id: vertex-model-garden-restrictions
+    name: "Model Garden Prohibited High-Cost Models Org Policy"
+    mechanism: "google_org_policy_policy (vertexai.allowedModels)"
+    active_folders: "untrusted_sandbox_folders"
+    denied_models:
+      - "publishers/google/models/ultra-high-cost-video-gen:predict"
+      - "publishers/google/models/unbounded-batch-inference:predict"
+
+  - id: hierarchical-egress-security-policies
+    name: "Hierarchical Org Security Policy Egress Denials"
+    mechanism: "Hierarchical Firewall Policy (gcloud compute org-security-policies)"
+    blocked_targets:
+      - "Known C2 & data exfiltration webhook ASNs"
+      - "Known crypto-mining Stratum pools & IP ranges"
+
+# -----------------------------------------------------------------------------
+# 2. ARCHITECTURE ROADMAP & DEFENSE-IN-DEPTH PATTERNS
+# -----------------------------------------------------------------------------
+platform_discussion_ideas:
+  - id: expand-sa-key-deny-all-tiers
+    priority: "P1"
+    name: "Expand IAM Deny SA Key Creation to All Sandbox Folders"
+    target_folders:
+      - "standard_sandbox"
+      - "ephemeral_workshop"
+      - "partner_demo"
+    implementation: "Attach module.deny_service_account_key_creation to all ephemeral sandbox folders"
+    justification: "Eliminates static JSON key export abuse across non-AI cloud sandboxes."
+
+  - id: global-imdsv2-org-policy
+    priority: "P1"
+    name: "Enforce IMDSv2 Globally on Compute Engine"
+    constraint: "constraints/compute.disableLegacyEndpoints"
+    target_folder: "folders/100000000100 (All Sandbox Projects)"
+    justification: "Closes SSRF token theft on web applications across all Compute Engine workloads."
+
+  - id: workload-identity-for-managed-ide
+    priority: "P1"
+    name: "Migrate Managed Web IDEs from Static JSON Keys to GKE Workload Identity Federation"
+    implementation: "See assets/platform_ideas/managed_ide_workload_identity.tf.template"
+    justification: "Eliminates mounted `/home/user/keys.json` files inside browser IDE containers."

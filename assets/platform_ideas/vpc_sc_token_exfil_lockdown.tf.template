@@ -1,0 +1,58 @@
+# ==============================================================================
+# PLATFORM IDEA: Targeted VPC Service Controls (VPC-SC) for Off-Platform Exfil Lockdown
+# ==============================================================================
+# Context:
+# Even without static JSON keys (`/home/user/keys.json`), a student with interactive
+# shell access inside a managed_ide_proxy container, Cloud Shell, or local `user_0` login
+# who legitimately holds `roles/aiplatform.user` can run `gcloud auth print-access-token`
+# (`ya29...`) and invoke `https://aiplatform.googleapis.com` from an external botnet IP.
+#
+# Architectural Solution:
+# Enclose the student project in a VPC Service Controls (VPC-SC) Service Perimeter
+# that restricts `aiplatform.googleapis.com` and `storage.googleapis.com` strictly to:
+#   1. The Student Project VPC (`default` / lab VPC)
+#   2. The `sandbox-platform-prod` GKE Cluster VPC / NAT IP ranges (Managed Web IDE Proxy & Grading)
+# Any external request using a stolen `keys.json`, `ya29...` bearer token, or `user_0`
+# login from outside the GCP perimeter is immediately rejected at Google's API Control
+# Plane with `403 VPC_SERVICE_CONTROLS`.
+# ==============================================================================
+
+resource "google_access_context_manager_access_level" "sandbox-platform_trusted_networks" {
+  parent = "accessPolicies/${var.access_policy_id}"
+  name   = "accessPolicies/${var.access_policy_id}/accessLevels/sandbox-platform_managed_ide_and_student_vpc"
+  title  = "ManagedWebIDE Pool VPC (sandbox-platform-terminal-vms-prod-00) & Student VPC"
+
+  basic {
+    conditions {
+      # Allow traffic originating from ManagedWebIDE regional Cloud NAT IPs (50 per region in main.tf)
+      ip_subnetworks = var.managed_ide_regional_nat_cidrs
+      vpc_network_sources {
+        vpc_subnetwork {
+          # Exact ManagedWebIDE student VM pool VPC from student_networks.tf:
+          network = "//compute.googleapis.com/projects/sandbox-platform-terminal-vms-prod-00/global/networks/student-vms"
+        }
+      }
+    }
+  }
+}
+
+resource "google_access_context_manager_service_perimeter" "genai_sandbox_perimeter" {
+  parent = "accessPolicies/${var.access_policy_id}"
+  name   = "accessPolicies/${var.access_policy_id}/servicePerimeters/genai_sandbox_lockdown"
+  title  = "GCP LLM Lab Perimeter (Blocks Off-Platform Token & Data Exfiltration)"
+
+  status {
+    resources = [
+      "projects/${var.student_project_number}"
+    ]
+    restricted_services = [
+      "aiplatform.googleapis.com",
+      "generativelanguage.googleapis.com",
+      "storage.googleapis.com",
+      "bigquery.googleapis.com"
+    ]
+    access_levels = [
+      google_access_context_manager_access_level.sandbox-platform_trusted_networks.name
+    ]
+  }
+}

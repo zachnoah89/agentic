@@ -1,0 +1,17 @@
+# Phase 2 Mitigation: Enforce IMDSv2
+# Use this on `google_compute_instance` resources to disable legacy metadata endpoints.
+# This prevents Server-Side Request Forgery (SSRF) attacks from stealing the instance's 
+# attached Service Account token if the lab hosts a vulnerable web application.
+
+resource "google_compute_instance" "hardened_vm" {
+  name         = "example-vm"
+  machine_type = "e2-medium"
+  zone         = var.gcp_zone
+
+  # ... other config ...
+
+  # Explicitly disable v1 legacy metadata endpoints
+  metadata = {
+    disable-legacy-endpoints = "TRUE"
+  }
+}

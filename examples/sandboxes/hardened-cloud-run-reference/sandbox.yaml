@@ -1,0 +1,19 @@
+schema_version: 2
+title: "Hardened Cloud Run & Vertex AI Reference Sandbox"
+environment:
+  resources:
+    - id: project_0
+      type: gcp_project
+      policy_tier: genai_sandbox
+      startup_script:
+        type: terraform
+        path: tf
+    - id: user_0
+      type: gcp_user
+      permissions:
+        - project: project_0
+          roles:
+            - roles/viewer
+            - roles/serviceusage.serviceUsageConsumer
+            - roles/run.admin
+            - roles/aiplatform.user

@@ -1,0 +1,9 @@
+{
+  "name": "sandbox-security-architect",
+  "description": "Autonomous security specialist for bulk fleet auditing, remediation patching, pre-merge validation, and batch PR rollouts across the Cloud Lab catalog. Use when conducting mass catalog updates or batch PRs. For interactive single-lab authoring or hardening, use the harden-sandbox skill directly.",
+  "subagent": true,
+  "mainAgent": false,
+  "configPath": {
+    "relativePathToConfig": "config.yaml"
+  }
+}

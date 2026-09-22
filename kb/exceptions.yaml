@@ -1,0 +1,27 @@
+# Cloud Sandbox Security Hardening Exceptions Registry
+#
+# Environments listed here are exempt from specific automated hardening checks
+# (e.g. intentional security training/CTF sandboxes, approved third-party SaaS egress,
+# or environments pending architectural review).
+#
+# Schema:
+# - slug: string (required) - Environment slug
+#   type: string (required) - intentional_vulnerability | third_party_egress | manual_sa_key | other
+#   reason: string (required) - Technical or security justification
+#   approved_by: string (required) - Approving security architect
+#   ticket: string (optional) - Issue tracker ID (e.g., SEC-101)
+#   date_approved: string (optional) - YYYY-MM-DD
+
+exceptions:
+  - slug: iam-ctf-privilege-escalation-challenge
+    type: intentional_vulnerability
+    reason: "Red/Blue training environment requiring engineers to identify and remediate overly permissive IAM bindings. Over-privileged baseline roles are intentional."
+    approved_by: "security-architecture@example.com"
+    ticket: "SEC-101"
+    date_approved: "2026-09-14"
+  - slug: iam-ctf-challenge
+    type: intentional_vulnerability
+    reason: "Alias for iam-ctf-privilege-escalation-challenge."
+    approved_by: "security-architecture@example.com"
+    ticket: "SEC-101"
+    date_approved: "2026-09-14"

@@ -1,0 +1,19 @@
+schema_version: 2
+title: "Managed Web IDE Proxy Key Exfiltration Demo"
+environment:
+  resources:
+    - id: project_0
+      type: gcp_project
+      policy_tier: genai_sandbox
+      startup_script:
+        type: terraform
+        path: tf
+    - id: web_ide
+      type: ide
+      project: project_0
+    - id: user_0
+      type: gcp_user
+      permissions:
+        - project: project_0
+          roles:
+            - roles/owner

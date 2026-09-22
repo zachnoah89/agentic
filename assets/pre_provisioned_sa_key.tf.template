@@ -1,0 +1,45 @@
+# Edge Case Mitigation: Pre-Provisioned Service Account Key (NON-LLM LABS ONLY)
+#
+# CRITICAL SECURITY WARNING (SEC-001):
+# 1. NEVER use `google_service_account_key` in a `policy_tier: genai_sandbox` / Generative AI lab, and
+#    NEVER grant `roles/aiplatform.user`, `roles/editor`, or `roles/owner` to `google_service_account.lab_sa`.
+# 2. WHY VPC EGRESS (`tf/secure_network.tf`) DOES NOT PROTECT THIS KEY:
+#    - `tf/secure_network.tf` protects **VM-attached Service Accounts** (where credentials stay inside the GCE VM
+#      via IMDSv2 `169.254.169.254` and all outbound traffic traverses the student VPC).
+#    - Once a `google_service_account_key` JSON file is readable by the student (via `output`, VM file, or IDE),
+#      the student can copy the JSON text out of their browser to an external machine and call Google Cloud
+#      Control-Plane APIs (`https://aiplatform.googleapis.com`) directly over the public internet, bypassing the VPC.
+#    - Note: Standard project-level IAM Conditions CANNOT restrict `origin.ip` without an Org-level Access Context
+#      Manager (ACM) Access Level, which lab Terraform lacks permissions (`403 PERMISSION_DENIED`) to create.
+# 3. HOW TO GRANULARLY LOCK DOWN A PRE-CREATED KEY IN TERRAFORM (WHEN REQUIRED FOR NON-LLM LABS):
+#    - Scope `lab_sa` strictly to the single non-LLM data role needed (e.g., `roles/storage.objectViewer` on one bucket).
+#    - Attach an IAM Condition (`request.time < ...`) so the role binding automatically expires after the lab window.
+
+resource "google_service_account" "lab_sa" {
+  account_id   = "scoped-non-llm-lab-sa"
+  display_name = "Scoped Non-LLM Lab Service Account"
+}
+
+# Granular Lockdown: Single non-LLM role + IAM Condition time-expiry (90 minutes from apply)
+resource "google_project_iam_member" "lab_sa_scoped_role" {
+  project = var.gcp_project_id
+  role    = "roles/storage.objectViewer" # NEVER use roles/aiplatform.user, roles/editor, or roles/owner
+  member  = "serviceAccount:${google_service_account.lab_sa.email}"
+
+  condition {
+    title       = "lab_session_expiry"
+    description = "Automatically expires SA permissions 2 hours after provisioning"
+    expression  = "request.time < timestamp(\"${timeadd(timestamp(), "2h")}\")"
+  }
+}
+
+resource "google_service_account_key" "pre_provisioned_key" {
+  service_account_id = google_service_account.lab_sa.name
+}
+
+# Output the key directly to the Cloud Sandbox Platform console (if sandbox.yaml captures it)
+output "student_sa_key" {
+  value     = base64decode(google_service_account_key.pre_provisioned_key.private_key)
+  sensitive = true
+}
+

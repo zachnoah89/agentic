@@ -1,0 +1,158 @@
+archetypes:
+  - id: vertex-ai-workbench
+    name: Vertex AI Workbench & Notebooks
+    description: Labs utilizing Vertex AI Workbench or User-Managed Notebooks for GenAI and data exploration.
+    detect:
+      any:
+        - tf_resource: google_workbench_instance
+        - tf_resource: google_notebooks_instance
+        - file_contains: "aiplatform.googleapis.com"
+        - instruction_keyword: "Vertex AI"
+        - instruction_keyword: "JupyterLab"
+    required_roles:
+      - role: roles/viewer
+        why: Console exploration and verification
+      - role: roles/serviceusage.serviceUsageConsumer
+        why: Consume APIs and quota
+      - role: roles/notebooks.admin
+        why: Manage notebook instance and access JupyterLab proxy
+      - role: roles/compute.admin
+        why: Cloud Sandbox Platform automated SSH key injection for assessment
+        provenance: [sandbox-demo, sandbox-demo, sandbox-demo]
+      - role: roles/iam.serviceAccountUser
+        why: Attach runtime instance service account
+      - role: roles/aiplatform.user
+        why: Interact with models and query Gemini APIs
+    nuances:
+      - "Append 2>&1 to grep statements when checking history.sqlite in assessments."
+      - "If prompt history is saved in Agent Studio UI, also grant roles/datastore.user."
+
+  - id: sandbox-ssh-healthcheck
+    name: Compute Engine VM with SSH Assessment
+    description: Labs running automated assessment scripts via Ruby user_0.SSH handles.
+    detect:
+      any:
+        - assessment_pattern: "user_0.SSH"
+        - assessment_pattern: "handles['user_0.SSH']"
+    required_roles:
+      - role: roles/compute.osLogin
+        why: Shell access via OS Login
+      - role: roles/iam.serviceAccountUser
+        why: Use the VM service account identity
+      - role: roles/iap.tunnelResourceAccessor
+        why: IAP tunnel connection for Cloud Shell and console SSH
+      - role: roles/compute.viewer
+        why: Resolve target instance details
+    failure_mode: >
+      Missing any of the quartet causes the Cloud Sandbox Platform assessment engine to fail SSH silently,
+      emitting a generic 'task not completed' error without student feedback.
+    provenance: [sandbox-demo]
+
+  - id: compute-ssh-sudo
+    name: Compute Engine VM with Sudo Execution
+    description: Labs where students SSH into VMs and execute sudo package installation or configuration.
+    detect:
+      any:
+        - instruction_keyword: "sudo apt"
+        - instruction_keyword: "sudo systemctl"
+        - tf_resource: google_compute_instance
+    required_roles:
+      - role: roles/viewer
+        why: Console browsing
+      - role: roles/compute.osAdminLogin
+        why: OS Login with sudo root authorization
+      - role: roles/iap.tunnelResourceAccessor
+        why: IAP tunnel access
+      - role: roles/iam.serviceAccountUser
+        why: VM SA attachment
+
+  - id: bigtable-developer
+    name: Cloud Bigtable
+    description: Labs creating and querying Cloud Bigtable instances.
+    detect:
+      any:
+        - tf_resource: google_bigtable_instance
+        - instruction_keyword: "cbt createtable"
+        - instruction_keyword: "cbt createfamily"
+    required_roles:
+      - role: roles/viewer
+        why: Console view
+      - role: roles/serviceusage.serviceUsageConsumer
+        why: cbt CLI tool quota queries
+      - role: roles/bigtable.admin
+        why: cbt DDL table and column family lifecycle commands
+        provenance: [sandbox-demo]
+
+  - id: cloud-run-developer
+    name: Cloud Run Service Deployment
+    description: Deploying containerized web apps or microservices to Cloud Run.
+    detect:
+      any:
+        - tf_resource: google_cloud_run_service
+        - tf_resource: google_cloud_run_v2_service
+        - instruction_keyword: "gcloud run deploy"
+    required_roles:
+      - role: roles/viewer
+        why: Console inspection
+      - role: roles/serviceusage.serviceUsageConsumer
+        why: CLI and API usage
+      - role: roles/run.admin
+        why: Manage Cloud Run services and revisions
+      - role: roles/storage.admin
+        why: GCS staging bucket creation during container deployment
+      - role: roles/cloudbuild.builds.editor
+        why: Container image builds
+
+  - id: cloud-terminal
+    name: Managed Web IDE Proxy Hosted Environment (IDE / Cloud Terminal / Looker / Jupyter / Mini-Lab)
+    description: >
+      Cloud Sandbox Platform Managed Web IDE Proxy containers hosted in external sandbox-platform-prod GKE cluster
+      that auto-inject static /home/user/keys.json via ide-provisioner@ exemption.
+    detect:
+      any:
+        - yaml_pattern: "type: cloud_terminal"
+        - yaml_pattern: "type: ide"
+        - yaml_pattern: "type: looker_instance"
+        - yaml_pattern: "type: jupyter_notebook"
+        - yaml_pattern: "cloud_terminal: true"
+        - yaml_pattern: "mini_lab"
+    severity: blocks-hardening
+    nuances:
+      - "Schema v2 Hard Constraint: Removing roles/editor from cloud_terminal in sandbox.yaml causes 'Resources failed to launch: shell'."
+      - "Silent Backend Escalation: The platform backend ignores custom YAML roles for cloud_terminal and hardcodes student credentials to receive roles/owner, roles/storage.admin, and roles/bigquery.admin."
+      - "Out-of-Band VPC Egress Gap: The cloud_terminal container runs in Google's managed tenant VPC, outside project_0. Therefore, secure_network.tf in project_0 protects GCE/GKE VMs inside project_0 but does NOT block outbound traffic originating directly from the terminal shell."
+      - "Terraform IAM Override Trap: Authors attempting to restrict student permissions via authoritative google_project_iam_policy in terraform-files/ often either bind roles/owner deceptively (mini-lab-28) or wipe out ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com (mini-lab-09)."
+    notes: >
+      Managed Web IDE Proxy resources (ide, cloud_terminal, looker_instance, jupyter_notebook) run in
+      sandbox-platform-prod GKE (outside the student VPC) and use ide-provisioner@ (which is exempted
+      from the genai_sandbox IAM Deny Policy in Policy-Deny-SA-Keys) to mint /home/user/keys.json with
+      project-wide roles. NEVER deploy on policy_tier: genai_sandbox (SEC-001). If GCP Console navigation
+      is acceptable, migrate to type: gcp_user + native Cloud Shell or GCE VM with attached SA inside
+      secure_network.tf. If cloud_terminal is strictly required on non-LLM fleets (e.g. 15-min mini-lab spec),
+      deploy secure_network.tf and IMDSv2 to protect any VMs in terraform-files/, and NEVER strip
+      ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com.
+
+  - id: custom-web-ide
+    name: VM-Backed Custom Web IDE / Workbench
+    description: Self-hosted web IDE (Code OSS, JupyterLab, Vertex Workbench, or custom_terminal GCE VM) running inside project_0 VPC.
+    detect:
+      any:
+        - tf_resource: google_notebooks_instance
+        - tf_resource: google_workbench_instance
+        - yaml_pattern: "custom_ide"
+        - yaml_pattern: "custom_terminal"
+        - file_contains: "code-server"
+    required_roles:
+      - role: roles/viewer
+        why: Console inspection
+      - role: roles/serviceusage.serviceUsageConsumer
+        why: CLI quota checks
+      - role: roles/notebooks.runner
+        why: Access and execute Vertex Workbench / Notebook instances
+      - role: roles/iap.tunnelResourceAccessor
+        why: Connect to VM-backed web IDE proxy via Identity-Aware Proxy (IAP)
+    nuances:
+      - "Runs inside project_0 VPC: Unlike cloud_terminal, VM-backed IDEs run on Compute Engine instances inside project_0 and ARE governed by tf/secure_network.tf."
+      - "IAP Proxy Requirement: Ensure firewall rules allow ingress from IAP TCP forwarding range (35.235.240.0/20 on ports 22, 80, 443, 8080) or the student's browser IDE will fail with 502 Bad Gateway."
+      - "IMDSv2 Mandatory: Always enforce disable-legacy-endpoints = 'TRUE' on the underlying IDE VM to prevent SSRF token theft from malicious notebook cells or extensions."
+

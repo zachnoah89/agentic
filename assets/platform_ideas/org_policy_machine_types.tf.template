@@ -1,0 +1,22 @@
+# Phase 3 / Org-Level Mitigation: Restrict Compute Engine Machine Types
+# Restricts GCE instances to low-cost machine types to prevent high-cost GPU mining abuse.
+# Note: Requires Org Policy Admin permissions.
+
+resource "google_org_policy_policy" "restrict_machine_types" {
+  name   = "projects/$${var.gcp_project_id}/policies/compute.restrictMachineTypes"
+  parent = "projects/$${var.gcp_project_id}"
+
+  spec {
+    rules {
+      values {
+        allowed_values = [
+          "is:e2-micro",
+          "is:e2-small",
+          "is:e2-medium",
+          "is:n1-standard-1",
+          "is:n1-standard-2"
+        ]
+      }
+    }
+  }
+}

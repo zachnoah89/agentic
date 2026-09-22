@@ -1,0 +1,50 @@
+# ==============================================================================
+# PLATFORM IDEA: Keyless Workload Identity / Host-VM Token Proxy for Managed Web IDE Proxy
+# ==============================================================================
+# Ground-Truth Code References:
+#   - Servicer (Key Injection): //depot/google3/cloud/training/sandbox-platform/ide_proxy/provisioner.py (L318-390)
+#   - VM Handler:               //depot/google3/cloud/training/sandbox-platform/managed_ide/instance_handler.py (L98-220)
+#   - Prod Pool TF:             //depot/google3/configs/cloud/gong/services/sandbox-platform_infrastructure/envs/services_prod/managed_ide_instance_prod_00/main.tf
+#   - Shared Pool VM SAs:       //depot/google3/configs/cloud/gong/services/sandbox-platform_infrastructure/modules/managed_ide_instance/artifact_registry.tf (L31-71)
+#
+# Architectural Discovery from Codebase:
+#   1. Managed Web IDE Proxy student resources (`cloud_terminal`, `ide`/Theia, `looker_instance`,
+#      `jupyter_notebook`) run as unprivileged Docker containers (`docker exec --user student`)
+#      on pre-warmed GCE VMs inside project `sandbox-platform-terminal-vms-prod-00` (network `student-vms`).
+#   2. Because VMs are pre-warmed in pools (e.g., 1,000 `cloud_terminal` VMs, 500 `theia` VMs),
+#      all VMs of a given type share a single VM-attached SA (e.g. `student-theia@sandbox-platform-terminal-vms-prod-00`).
+#      Therefore, you CANNOT bind `student-theia@` directly to a student project (or Student B
+#      on another pooled VM could access Student A's project).
+#   3. Instead, in `servicer.py` (`_get_authenticate_command`), `ManagedWebIDEServicer` has SSH
+#      access to the **host GCE VM** (`username='sandbox-platform'`), outside the student Docker container.
+#      Instead of writing `/home/user/keys.json` inside the container:
+#        - Option A (WIF OIDC Exchange): Issue a per-VM (`vm_name`) signed OIDC JWT mapped via
+#          Workload Identity Pool (`sts.googleapis.com`) to the student project's scoped SA.
+#        - Option B (Host-VM Metadata/Token Proxy — Cloud Shell Pattern): Run a lightweight token
+#          refresher on the host GCE VM (or via `iamcredentials.generateAccessToken`) that mounts
+#          only a rotated short-lived `access_token` file (`gcloud config set auth/access_token_file`)
+#          or intercepts `169.254.169.254` via `iptables` in `startup_scripts/linux.sh`.
+# ==============================================================================
+
+# 1. Dedicated Student Workload Service Account in Student Project
+resource "google_service_account" "managed_ide_proxy_student_sa" {
+  project      = var.student_project_id
+  account_id   = "ql-managed_ide_proxy-student"
+  display_name = "managed_ide_proxy Keyless Student SA (Scoped to Student IAM Policy)"
+}
+
+# 2. Mirror Least-Privilege Student IAM Policy (NEVER roles/owner or roles/editor)
+resource "google_project_iam_member" "managed_ide_proxy_scoped_roles" {
+  for_each = toset(var.student_scoped_roles) # e.g., ["roles/viewer", "roles/serviceusage.serviceUsageConsumer", "roles/aiplatform.user"]
+  project  = var.student_project_id
+  role     = each.value
+  member   = "serviceAccount:${google_service_account.managed_ide_proxy_student_sa.email}"
+}
+
+# 3. Allow Per-Session WIF Principal (scoped to specific vm_name claim) OR IDE-Provisioner Token Creator
+# Eliminates `iam.googleapis.com/serviceAccountKeys.create` (/home/user/keys.json)
+resource "google_service_account_iam_member" "managed_ide_proxy_session_wif_binding" {
+  service_account_id = google_service_account.managed_ide_proxy_student_sa.name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principal://iam.googleapis.com/projects/${var.sandbox-platform_Pool_project_number}/locations/global/workloadIdentityPools/managed_ide_proxy-pool/subject/${var.assigned_managed_ide_proxy_vm_name}"
+}

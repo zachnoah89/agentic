@@ -1,6 +1,6 @@
 # Agentic AI Systems & Cloud Security (`agentic`)
 
-A production portfolio of **Agentic AI Systems, MCP Servers, and Automated Cloud Security Architectures** by Zach Noah.
+A production portfolio of **Agentic AI Systems, MCP Servers, and Automated Cloud Security Architectures** by Zach Bruss-Arcand.
 
 [![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-green.svg)](https://modelcontextprotocol.io/)
 [![Architecture](https://img.shields.io/badge/Architecture-Deterministic%20%2B%20Agentic-blue.svg)]()

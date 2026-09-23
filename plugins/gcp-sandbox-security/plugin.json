@@ -1,5 +1,5 @@
 {
   "name": "gcp-sandbox-security",
   "version": "1.0.0",
-  "description": "Agentic Security Suite for Google Cloud & Vertex AI Sandboxes — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills."
+  "description": "Agentic Security Suite for Google Cloud & Agent Platform Sandboxes — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills."
 }

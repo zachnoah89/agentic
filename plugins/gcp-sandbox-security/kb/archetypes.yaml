@@ -1,13 +1,13 @@
 archetypes:
-  - id: vertex-ai-workbench
-    name: Vertex AI Workbench & Notebooks
-    description: Labs utilizing Vertex AI Workbench or User-Managed Notebooks for GenAI and data exploration.
+  - id: agent-platform-workbench
+    name: Agent Platform Workbench & Notebooks
+    description: Labs utilizing Agent Platform Workbench or User-Managed Notebooks for GenAI and data exploration.
     detect:
       any:
         - tf_resource: google_workbench_instance
         - tf_resource: google_notebooks_instance
         - file_contains: "aiplatform.googleapis.com"
-        - instruction_keyword: "Vertex AI"
+        - instruction_keyword: "Agent Platform"
         - instruction_keyword: "JupyterLab"
     required_roles:
       - role: roles/viewer

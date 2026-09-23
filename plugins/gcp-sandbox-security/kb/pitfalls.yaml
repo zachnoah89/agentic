@@ -86,15 +86,15 @@ pitfalls:
     applies_when:
       yaml_resource: [ide, cloud_terminal, looker_instance, jupyter_notebook]
       policy_tier: genai_sandbox
-    symptom: "Attackers exfiltrate /home/user/keys.json from Managed Web IDE Proxy IDE/terminal and run external Gemini/Vertex AI inference despite genai_sandbox IAM Deny Policy."
+    symptom: "Attackers exfiltrate /home/user/keys.json from Managed Web IDE Proxy IDE/terminal and run external Gemini/Agent Platform inference despite genai_sandbox IAM Deny Policy."
     cause: "Policy-Deny-SA-Keys (modules/deny_service_account_key_creation) exempts ide-provisioner@sandbox-platform-prod.iam.gserviceaccount.com. Managed Web IDE Proxy servicer.py uses ide-provisioner@ to mint a static JSON SA key with roles/editor or roles/aiplatform.user and mounts it at /home/user/keys.json inside the sandbox-platform-prod GKE cluster."
-    fix: "NEVER pair type: ide, cloud_terminal, looker_instance, or jupyter_notebook with policy_tier: genai_sandbox. Migrate the lab to native Cloud Shell / Vertex AI Workbench (type: gcp_user), or keep Managed Web IDE Proxy labs off genai_sandbox / public catalogs until Managed Web IDE Proxy supports keyless Workload Identity."
+    fix: "NEVER pair type: ide, cloud_terminal, looker_instance, or jupyter_notebook with policy_tier: genai_sandbox. Migrate the lab to native Cloud Shell / Agent Platform Workbench (type: gcp_user), or keep Managed Web IDE Proxy labs off genai_sandbox / public catalogs until Managed Web IDE Proxy supports keyless Workload Identity."
     provenance: { bug: SEC-001, cl: SEC-001, verified: true, author: znoah }
 
   - id: vpc-egress-firewall-control-plane-bypass
     applies_when:
       tf_resource: google_service_account_key
-    symptom: "Lab has tf/secure_network.tf deployed, yet attackers still burn Vertex AI / Gemini quota from external IPs."
+    symptom: "Lab has tf/secure_network.tf deployed, yet attackers still burn Agent Platform / Gemini quota from external IPs."
     cause: "tf/secure_network.tf is a Data-Plane VPC firewall that only governs packets originating from GCE VMs inside the student VPC (protecting attached Compute SAs via IMDSv2 169.254.169.254). Once a downloadable JSON key (google_service_account_key or /home/user/keys.json) is copied out of the browser, attackers invoke https://aiplatform.googleapis.com over the public internet (Control Plane), completely bypassing the student VPC."
     fix: "Use VM-attached google_service_account with disable-legacy-endpoints=TRUE (so credentials never leave the VPC) instead of google_service_account_key. If a google_service_account_key is strictly required by pedagogy, NEVER grant it roles/aiplatform.user, roles/editor, or roles/owner; scope it strictly to a single non-LLM resource role + IAM time-expiry condition."
     provenance: { bug: SEC-001, verified: true, author: znoah }
@@ -172,7 +172,7 @@ pitfalls:
   - id: iam-role-admin-custom-role-escalation
     applies_when:
       service: iam.googleapis.com
-    symptom: "A student with roles/iam.roleAdmin + Delegated projectIamAdmin (allowing a custom role ID) escalates to full Vertex AI / Compute admin."
+    symptom: "A student with roles/iam.roleAdmin + Delegated projectIamAdmin (allowing a custom role ID) escalates to full Agent Platform / Compute admin."
     cause: "roles/iam.roleAdmin allows iam.roles.update on any custom role in the project. Even if modifiedGrantsByRole restricts role bindings to projects/{project}/roles/{custom_role}, the student can add aiplatform.* or compute.* permissions into that custom role and bind it."
     fix: "Pre-create the custom role in Terraform, or do not combine roles/iam.roleAdmin with projectIamAdmin on user_0."
     severity: blocks-hardening

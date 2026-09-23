@@ -19,15 +19,15 @@ roles:
   - id: roles/storage.admin
     grants: Full control over Cloud Storage buckets and objects
     risk: low
-    why_safe: Ephemeral storage capped to lab runtime. Necessary for code deployment buckets (Cloud Functions, Vertex AI staging).
+    why_safe: Ephemeral storage capped to lab runtime. Necessary for code deployment buckets (Cloud Functions, Agent Platform staging).
 
   - id: roles/aiplatform.user
-    grants: Query Vertex AI models, chat prompts, evaluate results
+    grants: Query Agent Platform models, chat prompts, evaluate results
     risk: low
     why_safe: Interacts with GenAI models without ability to alter fine-tuned endpoints or model infrastructure.
 
   - id: roles/notebooks.admin
-    grants: Manage Vertex AI Workbench User-Managed Notebooks
+    grants: Manage Agent Platform Workbench User-Managed Notebooks
     risk: medium
     why_safe: Enables JupyterLab proxy UI access. Network isolation prevents external abuse. Must be paired with roles/iam.serviceAccountUser.
 
@@ -85,7 +85,7 @@ roles:
   - id: roles/datastore.user
     grants: Read/write Datastore / Firestore data
     risk: low
-    why_safe: Required for saving/loading prompt history in Vertex AI Agent Studio UI.
+    why_safe: Required for saving/loading prompt history in Agent Platform Agent Studio UI.
 
   - id: roles/iam.serviceAccountAdmin
     risk: critical

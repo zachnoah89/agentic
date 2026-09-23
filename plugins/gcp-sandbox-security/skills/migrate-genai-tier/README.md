@@ -60,6 +60,6 @@ python3 scripts/batch_migrate_genai_fleet.py --all --limit 10
 ## 🔒 Security & Policy Highlights
 
 The `genai_sandbox` fleet variant enforces a folder-level Google IAM Deny Policy on **`iam.googleapis.com/serviceAccountKeys.create`** for student sessions:
-* **Allowed**: Full access to Vertex AI Foundation Models, Gemini API, AI Studio, Prompt Gallery, and Application Default Credentials (ADC).
+* **Allowed**: Full access to Agent Platform Foundation Models, Gemini API, AI Studio, Prompt Gallery, and Application Default Credentials (ADC).
 * **Blocked**: Manual `gcloud iam service-accounts keys create` commands (preventing token theft and scraping bot abuse).
 * **Pre-Provisioning**: Keys required for lab runtime must be pre-provisioned via Terraform (`google_service_account_key`) since Navy backend service accounts are exempt from the deny policy.

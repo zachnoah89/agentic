@@ -141,7 +141,7 @@ def handle_recommend_iam_roles(args: Dict[str, Any]) -> Dict[str, Any]:
             "properties": {
                 "archetype": {
                     "type": "string",
-                    "description": "Archetype name or ID (e.g. 'vertex-ai-workbench', 'bigtable-developer').",
+                    "description": "Archetype name or ID (e.g. 'agent-platform-workbench', 'bigtable-developer').",
                 },
                 "services": {
                     "type": "array",
@@ -774,9 +774,9 @@ def main():
     print("======================================================================")
     print("Usage: cloud-sandbox-security <command> [args]\n")
     print("Instant Demos:")
-    print("  cloud-sandbox-security audit examples/sandboxes/overprivileged-vertex-agent")
+    print("  cloud-sandbox-security audit examples/sandboxes/overprivileged-agent-platform")
     print("  cloud-sandbox-security validate examples/sandboxes/hardened-cloud-run-reference")
-    print("  cloud-sandbox-security recommend examples/sandboxes/overprivileged-vertex-agent")
+    print("  cloud-sandbox-security recommend examples/sandboxes/overprivileged-agent-platform")
     print("  cloud-sandbox-security test")
     print("  cloud-sandbox-security serve    # Starts JSON-RPC 2.0 stdio server for AI agents\n")
     return 0

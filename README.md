@@ -21,27 +21,34 @@ This repository implements a **decoupled, multi-layered architecture** that sepa
 
 ```mermaid
 flowchart TD
-    subgraph Cognitive["1. Cognitive Layer (Skills & Personas)"]
-        Blue["Blue Team Skill<br/>(Remediation & Patching)"]
-        Red["Red Team Skill<br/>(Audit & PoC Verification)"]
-        Swarm["Fleet Subagents<br/>(Git Worktree Parallel Swarm)"]
+    subgraph Cognitive["1. Cognitive Layer (Skills & Subagents)"]
+        direction LR
+        Red["Red Team Skill<br/>(/pentest-sandbox)"]
+        Blue["Blue Team Skill<br/>(/harden-sandbox)"]
+        Swarm["Fleet Subagents<br/>(Git Worktree Swarm)"]
     end
 
-    subgraph Deterministic["2. Execution Layer (MCP Server)"]
-        AST["Static AST & Config Engine"]
-        Solver["Least-Privilege Role Solver"]
-        Gate["Pre-Merge PASS/FAIL Gate"]
+    subgraph Deterministic["2. Deterministic Execution Layer (MCP Server)"]
+        direction LR
+        AST["Static AST & Config Scanner<br/>(audit_lab)"]
+        Solver["Least-Privilege Role Solver<br/>(recommend_iam_roles)"]
+        Gate["Pre-Merge CI Gate & Patcher<br/>(validate_pre_merge)"]
     end
 
-    subgraph Memory["3. Memory Layer (Structured Knowledge Base)"]
-        Arch["Workload Archetype Signatures"]
-        Roles["Least-Privilege Role Mappings"]
-        Traps["Self-Learning Pitfall Registry"]
+    subgraph Memory["3. Structured Memory Layer (YAML Knowledge Base)"]
+        direction LR
+        Arch["Workload Archetypes &<br/>Org Policy Baselines"]
+        Roles["Scoped IAM Role Catalog<br/>(roles.yaml)"]
+        Traps["Self-Learning Pitfall Registry<br/>(pitfalls.yaml)"]
     end
 
-    Cognitive -->|Invokes via JSON-RPC| Deterministic
-    Deterministic -->|Queries & Learns into| Memory
-    Deterministic -->|Hard Enforcement| Gate
+    Red -->|JSON-RPC| AST
+    Blue -->|JSON-RPC| Solver
+    Swarm -->|JSON-RPC| Gate
+
+    AST -->|Evaluates| Arch
+    Solver -->|Resolves| Roles
+    Gate -->|Enforces & Learns| Traps
 ```
 
 ---
@@ -52,7 +59,7 @@ Each system in this repository is completely self-contained in `plugins/` with i
 
 | Plugin | Cloud Provider | Core Capabilities | Status |
 | :--- | :--- | :--- | :--- |
-| [**`gcp-sandbox-security`**](plugins/gcp-sandbox-security/) | **Google Cloud & Vertex AI** | Deterministic MCP server (12 tools), self-learning YAML knowledge base, least-privilege IAM solver, IMDSv2 enforcement, VPC egress lockdown, Web IDE key exfiltration blocking, and 4 runnable demo sandboxes. | 🟢 **Live & Verified** (12/12 Tests Passing) |
+| [**`gcp-sandbox-security`**](plugins/gcp-sandbox-security/) | **Google Cloud & Agent Platform** | Deterministic MCP server (12 tools), self-learning YAML knowledge base, least-privilege IAM solver, IMDSv2 enforcement, VPC egress lockdown, Web IDE key exfiltration blocking, and 4 runnable demo sandboxes. | 🟢 **Live & Verified** (12/12 Tests Passing) |
 | [**`aws-sandbox-security`**](plugins/aws-sandbox-security/) | **AWS & Amazon Bedrock** *(Roadmap)* | AWS IAM least-privilege analyzer, Service Control Policies (SCPs), IMDSv2 enforcement, STS token theft mitigation, Amazon Bedrock sandbox isolation, and VPC Endpoint egress lockdown. | 🟡 **In Development** |
 
 ---
@@ -73,14 +80,14 @@ cd plugins/gcp-sandbox-security
 
 ### Run Instant CLI Audits
 ```bash
-# Audit an overprivileged Vertex AI & Compute Engine sandbox:
-python3 mcp/server.py audit examples/sandboxes/overprivileged-vertex-agent
+# Audit an overprivileged Agent Platform & Compute Engine sandbox:
+python3 mcp/server.py audit examples/sandboxes/overprivileged-agent-platform
 
 # Run pre-merge validation gate on a hardened reference sandbox:
 python3 mcp/server.py validate examples/sandboxes/hardened-cloud-run-reference
 
 # Compute minimal IAM roles and operational gotchas:
-python3 mcp/server.py recommend examples/sandboxes/overprivileged-vertex-agent
+python3 mcp/server.py recommend examples/sandboxes/overprivileged-agent-platform
 ```
 
 ---
@@ -114,7 +121,7 @@ agentic/
 │   └── mcp.json                       # Global Cursor MCP registration
 │
 └── plugins/
-    ├── gcp-sandbox-security/          # Google Cloud & Vertex AI Security Suite
+    ├── gcp-sandbox-security/          # Google Cloud & Agent Platform Security Suite
     │   ├── README.md                  # Deep-Dive GCP Security Documentation
     │   ├── pyproject.toml             # Standalone Python packaging
     │   ├── install.sh                 # Fast installer & verification test runner

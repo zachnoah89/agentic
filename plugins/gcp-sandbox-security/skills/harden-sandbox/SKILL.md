@@ -217,10 +217,10 @@ When requested for a lab hardening rollout, determine the lab's **Verification T
 
 ### 1. Two-Track QA Routing (`/execute-lab` Bypass vs. Console UI QA)
 * **Track 1 — Auto-Verify & Bypass QA Team (`qa-track:cli-auto-verify`)**:
-  - **Criteria**: Labs where student steps are CLI/script-driven (`gcloud`, `bq`, `kubectl`, `terraform`, `curl`) or Vertex AI Workbench `.ipynb` notebooks where `/execute-lab` + Activity Tracking (`/assessments/run_step.json`) can verify provisioning, permissions, and grading end-to-end.
+  - **Criteria**: Labs where student steps are CLI/script-driven (`gcloud`, `bq`, `kubectl`, `terraform`, `curl`) or Agent Platform Workbench `.ipynb` notebooks where `/execute-lab` + Activity Tracking (`/assessments/run_step.json`) can verify provisioning, permissions, and grading end-to-end.
   - **Action**: Run `/execute-lab` + `/assessments/run_step.json` $\rightarrow$ post the verification report to the child ticket $\rightarrow$ assign the child ticket to **`${USER:-znoah}@google.com`** (current author/reviewer) $\rightarrow$ **merge the PR directly to `main`** for immediate re-publishing (bypassing `training-qa-testers@google.com`).
 * **Track 2 — Human Console UI QA (`qa-track:console-ui-qa`)**:
-  - **Criteria**: Labs requiring human browser click-paths inside the Google Cloud Console UI (e.g. SCC Console wizards, Gemini in BigQuery SQL Studio UI, Vertex AI Studio prompt UI, Looker Studio) that `/execute-lab` cannot drive via CLI.
+  - **Criteria**: Labs requiring human browser click-paths inside the Google Cloud Console UI (e.g. SCC Console wizards, Gemini in BigQuery SQL Studio UI, Agent Platform Studio prompt UI, Looker Studio) that `/execute-lab` cannot drive via CLI.
   - **Action**: Run `/execute-lab` first-pass to verify clean staging startup (`startup_script_state == "complete"`) $\rightarrow$ post the pre-flight report to the child ticket $\rightarrow$ assign the child ticket (`P1`) to **`training-qa-testers@google.com`**.
 
 ### 2. Uniform Child GitHub Issues Ticket Specification

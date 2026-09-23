@@ -1,5 +1,5 @@
 schema_version: 2
-title: "Hardened Cloud Run & Vertex AI Reference Sandbox"
+title: "Hardened Cloud Run & Agent Platform Reference Sandbox"
 environment:
   resources:
     - id: project_0

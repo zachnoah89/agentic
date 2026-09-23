@@ -5,19 +5,19 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gcp-sandbox-security"
 version = "1.0.0"
-description = "Agentic Security Suite for Google Cloud & Vertex AI Sandboxes — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills."
+description = "Agentic Security Suite for Google Cloud & Agent Platform Sandboxes — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Zach Noah"}
+    {name = "Zach Bruss-Arcand"}
 ]
 keywords = [
     "mcp",
     "model-context-protocol",
     "cloud-security",
     "ai-security",
-    "vertex-ai",
+    "agent-platform",
     "genai",
     "terraform",
     "agentic-ai",

@@ -1,5 +1,5 @@
-sandbox_slug,current_tier,uses_vertex_ai,has_managed_ide_proxy,has_exported_sa_key,migration_status
-overprivileged-vertex-agent,genai_sandbox,True,False,False,READY_FOR_HARDENING
+sandbox_slug,current_tier,uses_agent_platform,has_managed_ide_proxy,has_exported_sa_key,migration_status
+overprivileged-agent-platform,genai_sandbox,True,False,False,READY_FOR_HARDENING
 managed-ide-key-leak,genai_sandbox,True,True,True,BLOCKED_MANAGED_IDE_AND_SA_KEY
 hardened-cloud-run-reference,genai_sandbox,True,False,False,HARDENED_PASS
 iam-ctf-privilege-escalation-challenge,standard_sandbox,False,False,False,EXEMPT_CTF_CHALLENGE

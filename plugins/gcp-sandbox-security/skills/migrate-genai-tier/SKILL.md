@@ -3,7 +3,7 @@ name: migrate-genai-tier
 description: >-
   Use this skill when asked to migrate a lab to the genai_sandbox fleet variant,
   mitigate service account key abuse on Generative AI labs, or update
-  sandbox.yaml project resources for labs using Gemini, Vertex AI Studio,
+  sandbox.yaml project resources for labs using Gemini, Agent Platform Studio,
   Agent Builder, Reasoning Engine, PaLM, or GenAI SDKs, even if the user
   does not explicitly mention "genai_sandbox" or "fleet variant". Audits the lab
   directory with audit_genai_sandbox.py to verify absence of manual service account
@@ -14,7 +14,7 @@ description: >-
 
 # Migrate Lab to `genai_sandbox` Fleet Variant
 
-This skill guides the agent to migrate Google Cloud ephemeral cloud sandboxes utilizing Generative AI (Gemini, Vertex AI Studio, Agent Builder, Model Garden, PaLM/Bison, GenAI SDKs) to the **`genai_sandbox`** fleet variant in `sandbox.yaml`.
+This skill guides the agent to migrate Google Cloud ephemeral cloud sandboxes utilizing Generative AI (Gemini, Agent Platform Studio, Agent Builder, Model Garden, PaLM/Bison, GenAI SDKs) to the **`genai_sandbox`** fleet variant in `sandbox.yaml`.
 
 ---
 
@@ -26,7 +26,7 @@ $$\text{Denied Permission: } \texttt{iam.googleapis.com/serviceAccountKeys.creat
 
 ### Why this migration is required:
 1. **Shifting reCAPTCHA Friction**: Shifting the QR Code / Modac reCAPTCHA from general user signup to *only* when a broad-reach learner launches an LLM lab ([SEC-105](http://SEC-105)).
-2. **Abuse Mitigation**: Prevents malicious actors from exfiltrating JSON service account keys to run external scraping/LLM bots against Gemini and Vertex AI APIs using Cloud Sandbox Platform billing.
+2. **Abuse Mitigation**: Prevents malicious actors from exfiltrating JSON service account keys to run external scraping/LLM bots against Gemini and Agent Platform APIs using Cloud Sandbox Platform billing.
 3. **Backend Exemption & ManagedWebIDE Warning ([SEC-001](http://SEC-001))**: Because Cloud Sandbox Platform internal orchestrator service accounts (`ide-provisioner@`) are exempted from the `genai_sandbox` IAM Deny Policy (`Policy-Deny-SA-Keys`), any ManagedWebIDE resource (`ide`, `cloud_terminal`, `looker_instance`, `jupyter_notebook`) will mint and mount `/home/user/keys.json` in `sandbox-platform-prod`, bypassing the deny policy. Therefore, **ManagedWebIDE labs MUST NEVER be migrated to `policy_tier: genai_sandbox`**.
 
 ---
@@ -82,7 +82,7 @@ environment:
 ```
 
 #### Multi-Project Considerations:
-* If a lab has multiple GCP projects (e.g. `project_0` and `project_1`), apply `policy_tier: genai_sandbox` to any project resource where Vertex AI, Gemini, or GenAI services are invoked.
+* If a lab has multiple GCP projects (e.g. `project_0` and `project_1`), apply `policy_tier: genai_sandbox` to any project resource where Agent Platform, Gemini, or GenAI services are invoked.
 * Preserve all other existing resource keys: `custom_properties`, `allowed_locations`, and IAM role bindings.
 
 ---
@@ -154,7 +154,7 @@ To migrate multiple catalog labs in batch with automated child ticket creation, 
 
 ```bash
 # Migrate a specific batch of labs:
-python3 .agent/plugins/cloud-sandbox-security/skills/migrate-genai-tier/scripts/batch_migrate_genai_fleet.py --slugs sandbox-demo-getting-started-with-vertex-ai-studio sandbox-demo-prompt-design-in-vertex-ai-studio
+python3 .agent/plugins/cloud-sandbox-security/skills/migrate-genai-tier/scripts/batch_migrate_genai_fleet.py --slugs sandbox-demo-getting-started-with-agent-platform-studio sandbox-demo-prompt-design-in-agent-platform-studio
 
 # Or migrate all identified catalog LLM labs in batches:
 python3 .agent/plugins/cloud-sandbox-security/skills/migrate-genai-tier/scripts/batch_migrate_genai_fleet.py --all --limit 10

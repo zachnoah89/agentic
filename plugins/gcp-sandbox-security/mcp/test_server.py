@@ -8,7 +8,7 @@ import sys
 import unittest
 
 SERVER_PY = os.path.join(os.path.dirname(__file__), "server.py")
-TEST_LAB = "overprivileged-vertex-agent"
+TEST_LAB = "overprivileged-agent-platform"
 
 
 def call_mcp(requests):

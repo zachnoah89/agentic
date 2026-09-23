@@ -1,6 +1,6 @@
 # GCP Sandbox Security Suite (`gcp-sandbox-security`)
 
-An end-to-end **Agentic Security Engineering Suite for Google Cloud & Vertex AI** combining a **deterministic Python MCP server**, a **self-learning YAML knowledge base**, **adversarial Red/Blue security skills**, and a **Git worktree fleet orchestrator** for hardening ephemeral GCP sandbox and workshop environments.
+An end-to-end **Agentic Security Engineering Suite for Google Cloud & Agent Platform** combining a **deterministic Python MCP server**, a **self-learning YAML knowledge base**, **adversarial Red/Blue security skills**, and a **Git worktree fleet orchestrator** for hardening ephemeral GCP sandbox and workshop environments.
 
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-JSON--RPC%202.0-green.svg)](https://modelcontextprotocol.io/)
@@ -22,21 +22,21 @@ cd agentic/plugins/gcp-sandbox-security
 Or run the CLI directly against the included demo sandboxes:
 
 ```bash
-# 1. Audit a vulnerable Vertex AI & GCE sandbox:
-python3 mcp/server.py audit examples/sandboxes/overprivileged-vertex-agent
+# 1. Audit a vulnerable Agent Platform & GCE sandbox:
+python3 mcp/server.py audit examples/sandboxes/overprivileged-agent-platform
 
 # 2. Check the pre-merge gate on a hardened reference sandbox:
 python3 mcp/server.py validate examples/sandboxes/hardened-cloud-run-reference
 
 # 3. Compute least-privilege IAM roles and operational traps:
-python3 mcp/server.py recommend examples/sandboxes/overprivileged-vertex-agent
+python3 mcp/server.py recommend examples/sandboxes/overprivileged-agent-platform
 ```
 
 ### Example Audit Output
 
 ```text
 ======================================================================
- 🛡️  CLOUD SANDBOX SECURITY AUDIT: overprivileged-vertex-agent
+ 🛡️  CLOUD SANDBOX SECURITY AUDIT: overprivileged-agent-platform
 ======================================================================
  Summary: 6 Findings (CRITICAL: 3 | HIGH: 0 | WARNING: 1 | INFO: 2)
 
@@ -69,40 +69,40 @@ Prompt-only security agents struggle in production infrastructure-as-code (IaC) 
 This project decouples **probabilistic agent reasoning** from **deterministic security verification**:
 
 ```mermaid
-flowchart LR
-    subgraph Agents["Agentic Layer (Skills & Subagents)"]
-        Blue["Blue Team Skill<br/>(/harden-sandbox)"]
+flowchart TD
+    subgraph Agents["1. Agentic Layer (Skills & Subagents)"]
+        direction LR
         Red["Red Team Skill<br/>(/pentest-sandbox)"]
-        GenAI["Fleet Tier Migrator<br/>(/migrate-genai-tier)"]
+        Blue["Blue Team Skill<br/>(/harden-sandbox)"]
+        GenAI["Tier Migrator Skill<br/>(/migrate-genai-tier)"]
         Swarm["Worktree Batch Subagent<br/>(sandbox-security-architect)"]
     end
 
-    subgraph MCP["Deterministic MCP Server (mcp/server.py)"]
+    subgraph MCP["2. Deterministic MCP Server (mcp/server.py)"]
+        direction LR
         Audit["audit_lab()<br/>Static AST & Config Scanner"]
         Recommend["recommend_iam_roles()<br/>Archetype Role Solver"]
         Patch["apply_security_patch()<br/>Unified Diff Generator"]
-        Gate["validate_pre_merge()<br/>Hard PASS/FAIL CI Gate"]
-        Learn["record_pitfall()<br/>Continuous KB Writer"]
+        Gate["validate_pre_merge() &<br/>record_pitfall()"]
     end
 
-    subgraph KB["Versioned YAML Knowledge Base (kb/)"]
-        Arch["archetypes.yaml<br/>Workload Signatures"]
-        Roles["roles.yaml<br/>Least-Privilege Grants"]
-        Pitfalls["pitfalls.yaml<br/>Operational Quirks & Traps"]
+    subgraph KB["3. Versioned YAML Knowledge Base (kb/ & assets/)"]
+        direction LR
         OrgPol["org_policies.yaml &<br/>exceptions.yaml"]
+        Roles["archetypes.yaml &<br/>roles.yaml"]
+        Assets["assets/*.tf.template<br/>Hardened HCL Templates"]
+        Pitfalls["pitfalls.yaml<br/>Self-Learning Trap Registry"]
     end
 
-    Blue --> Recommend
-    Blue --> Patch
-    Blue --> Gate
-    Red --> Audit
-    Swarm --> Patch
-    Swarm --> Gate
-    Recommend --> Arch
-    Recommend --> Roles
-    Recommend --> Pitfalls
-    Audit --> OrgPol
-    Learn -->|Writes new findings| Pitfalls
+    Red -->|JSON-RPC| Audit
+    Blue -->|JSON-RPC| Recommend
+    GenAI -->|JSON-RPC| Patch
+    Swarm -->|JSON-RPC| Gate
+
+    Audit -->|Checks| OrgPol
+    Recommend -->|Solves| Roles
+    Patch -->|Renders| Assets
+    Gate -->|Enforces & Writes| Pitfalls
 ```
 
 ---
@@ -178,7 +178,7 @@ ln -sfn "$(pwd)" ~/.gemini/config/plugins/cloud-sandbox-security
 
 | Sandbox Slug | Features & Threat Models | Pre-Merge Status |
 | :--- | :--- | :--- |
-| `overprivileged-vertex-agent` | Vertex AI Gemini + BigQuery + GCE VM with `roles/editor`, leftover `projectIamAdmin`, missing runtime.yaml, and no egress firewall. | ❌ `FAIL` (3 Criticals) |
+| `overprivileged-agent-platform` | Agent Platform Gemini + BigQuery + GCE VM with `roles/editor`, leftover `projectIamAdmin`, missing runtime.yaml, and no egress firewall. | ❌ `FAIL` (3 Criticals) |
 | `managed-ide-key-leak` | Pairs a Managed Web IDE container mounting static keys with `policy_tier: genai_sandbox`, minting an exported `google_service_account_key` on `roles/aiplatform.user`. | ❌ `FAIL` (Exfiltration Block) |
 | `hardened-cloud-run-reference` | Gold-standard reference environment: Scoped minimal IAM (`roles/run.admin`, `roles/storage.admin`, `roles/viewer`), `tf/secure_network.tf` egress firewall, `tf/runtime.yaml`, and IMDSv2. | ✅ `PASS` (0 Violations) |
 | `iam-ctf-privilege-escalation-challenge` | Intentional security challenge sandbox registered in [`kb/exceptions.yaml`](kb/exceptions.yaml). | ✅ `PASS_WITH_EXCEPTION` |

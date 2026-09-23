@@ -28,6 +28,9 @@ FALLBACK_PROTOCOL = "2024-11-05"
 
 # Base directory paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
 PLUGIN_DIR = os.environ.get(
     "PLUGIN_DIR", os.path.dirname(SCRIPT_DIR)
 )
@@ -38,7 +41,10 @@ LAB_REPO_ROOT = os.environ.get(
 )
 
 # Initialize Security Engine
-from security_engine import SecurityEngine
+try:
+    from security_engine import SecurityEngine
+except ImportError:
+    from .security_engine import SecurityEngine
 
 engine = SecurityEngine(plugin_dir=PLUGIN_DIR, lab_repo_root=LAB_REPO_ROOT)
 
@@ -629,5 +635,152 @@ def run_server():
             sys.stdout.flush()
 
 
+def _print_audit_report(res: Dict[str, Any]):
+    """Pretty prints deterministic audit results to terminal."""
+    slug = res.get("lab_slug", "Unknown")
+    findings = res.get("findings", [])
+    crit = sum(1 for f in findings if f.get("severity") == "CRITICAL")
+    high = sum(1 for f in findings if f.get("severity") == "HIGH")
+    warn = sum(1 for f in findings if f.get("severity") == "WARNING")
+    info = sum(1 for f in findings if f.get("severity") == "INFO")
+    total = len(findings)
+
+    print("\n" + "=" * 70)
+    print(f" 🛡️  CLOUD SANDBOX SECURITY AUDIT: {slug}")
+    print("=" * 70)
+    print(f" Summary: {total} Findings (CRITICAL: {crit} | HIGH: {high} | WARNING: {warn} | INFO: {info})\n")
+
+    if total == 0:
+        print("  ✅ All deterministic checks PASSED! Zero security violations detected.\n")
+        return
+
+    for idx, f in enumerate(res.get("findings", []), 1):
+        sev = f.get("severity", "INFO")
+        badge = f"[{sev}]"
+        print(f" {idx}. {badge:10} {f.get('rule_id')} ({f.get('file')})")
+        print(f"    Message:     {f.get('message')}")
+        if f.get("remediation"):
+            print(f"    Remediation: {f.get('remediation')}")
+        print()
+
+
+def _print_validate_report(res: Dict[str, Any]):
+    """Pretty prints pre-merge validation gate report."""
+    status = res.get("status", "UNKNOWN")
+    slug = res.get("lab_slug", "Unknown")
+    blocks = res.get("blocking_violations_count", 0)
+
+    print("\n" + "=" * 70)
+    print(f" 🚦 PRE-MERGE SECURITY GATE: {slug}")
+    print("=" * 70)
+    if status in ("PASS", "PASS_WITH_EXCEPTION"):
+        print(f" Status: ✅ {status}")
+    else:
+        print(f" Status: ❌ {status} ({blocks} Blocking Violations)")
+
+    print(f" Message: {res.get('message')}")
+    if res.get("blocking_violations"):
+        print("\n Blocking Findings:")
+        for idx, bv in enumerate(res.get("blocking_violations"), 1):
+            print(f"  {idx}. [{bv.get('severity')}] {bv.get('rule_id')} in {bv.get('file')}")
+            print(f"     {bv.get('message')}")
+    print()
+
+
+def _print_recommend_report(res: Dict[str, Any]):
+    """Pretty prints IAM role recommendations and pitfalls."""
+    slug = res.get("lab_slug", "Unknown")
+    print("\n" + "=" * 70)
+    print(f" 🔑 LEAST-PRIVILEGE IAM RECOMMENDATIONS: {slug}")
+    print("=" * 70)
+    print(" Recommended Minimal Roles:")
+    for r in res.get("recommended_roles", []):
+        print(f"  + {r.get('role'):40} (Reason: {r.get('reason')})")
+
+    if res.get("roles_to_remove"):
+        print("\n Roles to Remove (Over-privileged):")
+        for rr in res.get("roles_to_remove", []):
+            print(f"  - {rr}")
+
+    if res.get("applicable_pitfalls"):
+        print("\n Operational Pitfalls & Grading Traps:")
+        for idx, p in enumerate(res.get("applicable_pitfalls", []), 1):
+            print(f"  {idx}. [{p.get('id')}] {p.get('symptom')}")
+            print(f"     Cause: {p.get('cause')}")
+            print(f"     Fix:   {p.get('fix')}")
+    print()
+
+
+def main():
+    """Dual-mode entry point: CLI commands or MCP JSON-RPC server."""
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        if cmd == "serve":
+            run_server()
+            return 0
+        if cmd == "audit" and len(sys.argv) > 2:
+            target = sys.argv[2]
+            res = engine.audit_lab(target)
+            if "--json" in sys.argv:
+                print(json.dumps(res, indent=2))
+            else:
+                _print_audit_report(res)
+            return 1 if res.get("critical_count", 0) > 0 or res.get("high_count", 0) > 0 else 0
+        if cmd == "validate" and len(sys.argv) > 2:
+            target = sys.argv[2]
+            res = engine.validate_pre_merge(target)
+            if "--json" in sys.argv:
+                print(json.dumps(res, indent=2))
+            else:
+                _print_validate_report(res)
+            return 0 if res.get("status") in ("PASS", "PASS_WITH_EXCEPTION") else 1
+        if cmd == "recommend" and len(sys.argv) > 2:
+            target = sys.argv[2]
+            res = engine.recommend_iam_roles(target)
+            if "--json" in sys.argv:
+                print(json.dumps(res, indent=2))
+            else:
+                _print_recommend_report(res)
+            return 0
+        if cmd == "fleet":
+            res = engine.get_fleet_status()
+            print(json.dumps(res, indent=2))
+            return 0
+        if cmd == "test":
+            import unittest
+            suite = unittest.defaultTestLoader.discover(SCRIPT_DIR, pattern="test_*.py")
+            runner = unittest.TextTestRunner(verbosity=2)
+            result = runner.run(suite)
+            return 0 if result.wasSuccessful() else 1
+        if cmd in ("-h", "--help", "help"):
+            print("Usage: cloud-sandbox-security <command> [options]\n")
+            print("Commands:")
+            print("  audit <slug_or_path>      Run deterministic static security audit")
+            print("  validate <slug_or_path>   Run pre-merge validation gate (PASS/FAIL)")
+            print("  recommend <slug_or_path>  Compute least-privilege IAM roles and pitfalls")
+            print("  fleet                     Show catalog hardening metrics")
+            print("  test                      Run internal test suite")
+            print("  serve                     Start JSON-RPC 2.0 MCP server over stdio")
+            return 0
+
+    # If piped/redirected (standard MCP runner invocation like Claude Code / Cursor)
+    if not sys.stdin.isatty():
+        run_server()
+        return 0
+
+    # If run in an interactive terminal with no args, print friendly banner
+    print("======================================================================")
+    print(" 🛡️  Cloud Sandbox Security Suite (Dual-Mode MCP Server & Security CLI)")
+    print("======================================================================")
+    print("Usage: cloud-sandbox-security <command> [args]\n")
+    print("Instant Demos:")
+    print("  cloud-sandbox-security audit examples/sandboxes/overprivileged-vertex-agent")
+    print("  cloud-sandbox-security validate examples/sandboxes/hardened-cloud-run-reference")
+    print("  cloud-sandbox-security recommend examples/sandboxes/overprivileged-vertex-agent")
+    print("  cloud-sandbox-security test")
+    print("  cloud-sandbox-security serve    # Starts JSON-RPC 2.0 stdio server for AI agents\n")
+    return 0
+
+
 if __name__ == "__main__":
-    run_server()
+    sys.exit(main() or 0)

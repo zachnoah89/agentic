@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cloud-sandbox-security"
+name = "gcp-sandbox-security"
 version = "1.0.0"
-description = "Agentic Cloud & GenAI Sandbox Security Suite — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills for hardening ephemeral cloud environments."
+description = "Agentic Security Suite for Google Cloud & Vertex AI Sandboxes — Deterministic MCP server, self-learning YAML knowledge base, and Red/Blue security skills."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
@@ -17,6 +17,7 @@ keywords = [
     "model-context-protocol",
     "cloud-security",
     "ai-security",
+    "vertex-ai",
     "genai",
     "terraform",
     "agentic-ai",
@@ -40,7 +41,7 @@ Repository = "https://github.com/zachnoah89/agentic.git"
 Issues = "https://github.com/zachnoah89/agentic/issues"
 
 [project.scripts]
-cloud-sandbox-security = "mcp.server:main"
+gcp-sandbox-security = "mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

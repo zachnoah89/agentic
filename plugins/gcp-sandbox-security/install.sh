@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "======================================================================"
-echo " 🛡️  Installing Cloud Sandbox Security Suite"
+echo " 🛡️  Installing GCP Sandbox Security Suite (gcp-sandbox-security)"
 echo "======================================================================"
 
 # 1. Verify Python 3
@@ -44,14 +44,14 @@ echo "🤖 Checking for AI Agent Clients..."
 if command -v claude &>/dev/null; then
   echo "  Found Claude Code CLI!"
   echo "  To register the MCP server with Claude Code, run:"
-  echo "    claude mcp add cloud_sandbox_security -- python3 \"$SCRIPT_DIR/mcp/server.py\" serve"
+  echo "    claude mcp add gcp_sandbox_security -- python3 \"$SCRIPT_DIR/mcp/server.py\" serve"
 fi
 
 # Gemini CLI
 if [ -d "$HOME/.gemini/config/plugins" ]; then
   echo "  Found Gemini CLI config directory (~/.gemini/config/plugins)!"
   echo "  To register as a plugin (optional):"
-  echo "    ln -sfn \"$SCRIPT_DIR\" ~/.gemini/config/plugins/cloud-sandbox-security"
+  echo "    ln -sfn \"$SCRIPT_DIR\" ~/.gemini/config/plugins/gcp-sandbox-security"
 fi
 
 # Cursor
